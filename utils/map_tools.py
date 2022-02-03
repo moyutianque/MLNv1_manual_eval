@@ -102,5 +102,17 @@ def to_grid(
     grid_y = int((realworld_y - lower_bound[0]) / grid_size[1])
     return grid_x, grid_y
 
-
+def from_grid(
+    grid_x: int,
+    grid_y: int,
+    grid_resolution: Tuple[int, int],
+    lower_bound, upper_bound
+) -> Tuple[float, float]:
+    grid_size = (
+        abs(upper_bound[2] - lower_bound[2]) / grid_resolution[0],
+        abs(upper_bound[0] - lower_bound[0]) / grid_resolution[1],
+    )
+    realworld_x = lower_bound[2] + grid_x * grid_size[0]
+    realworld_y = lower_bound[0] + grid_y * grid_size[1]
+    return realworld_x, realworld_y
 
