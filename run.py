@@ -84,22 +84,25 @@ class ImageViewer(QWidget):
         
         # Draw nav map
         draw_agent(start_grid_pos, episode['start_rotation'], nav_map)
+        self.nav_start_only = Image.fromarray(nav_map)
+        self.update_image(self.nav_start_only.convert("RGB"))
+
         draw_path(nav_map, gt_annt, grid_dimensions, upper_bound, lower_bound)
 
+        # Draw answers (ground truth path and end position)
         self.pil_nav_img = Image.fromarray(nav_map)
         #draw_point(self.pil_nav_img, start_grid_pos[1], start_grid_pos[0], point_size=10, color=(0, 0, 255, 255))
         draw_point(self.pil_nav_img, end_grid_pos[1], end_grid_pos[0], point_size=10, color=(255, 0, 0, 255))
         overlay = Image.new('RGBA', self.pil_nav_img.size, (255,0,0)+(0,))
         draw_point(overlay, end_grid_pos[1], end_grid_pos[0], point_size=int(end_radius/0.05), color=(255, 0, 0, 50))
-
         
-
         self.pil_nav_img = Image.alpha_composite(self.pil_nav_img, overlay)
-        self.update_image(self.pil_nav_img.convert("RGB"))
-
+        #self.update_image(self.pil_nav_img.convert("RGB"))
+    
         self.cnt += 1
     
-
+    def show_ans(self):
+        self.update_image(self.pil_nav_img.convert("RGB"))
 
     def setup_ui(self):
         self.map_region = QVBoxLayout()
@@ -119,6 +122,10 @@ class ImageViewer(QWidget):
         button_invalid = QPushButton("Invalid instruction")
         button_invalid.clicked.connect(lambda: self.annotate(value=False))
         self.map_region.addWidget(button_invalid)
+
+        button_ans = QPushButton("Show answer")
+        button_ans.clicked.connect(lambda: self.show_ans())
+        self.map_region.addWidget(button_ans)
 
         button_next = QPushButton("Next episode")
         button_next.clicked.connect(lambda: self.reset_ep())
