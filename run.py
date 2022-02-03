@@ -13,7 +13,7 @@ import time
 import gzip
 import json
 import random
-random.seed(0)
+# random.seed(0)
 from utils.map_tools import get_maps, simloc2maploc, draw_agent, draw_point, draw_path
 from PIL import Image
 import numpy as np
@@ -84,8 +84,8 @@ class ImageViewer(QWidget):
         
         # Draw nav map
         draw_agent(start_grid_pos, episode['start_rotation'], nav_map)
-        self.nav_start_only = Image.fromarray(nav_map)
-        self.update_image(self.nav_start_only.convert("RGB"))
+        self.map = Image.fromarray(np.copy(nav_map))
+        self.update_image(self.map.convert("RGB"))
 
         draw_path(nav_map, gt_annt, grid_dimensions, upper_bound, lower_bound)
 
@@ -102,7 +102,8 @@ class ImageViewer(QWidget):
         self.cnt += 1
     
     def show_ans(self):
-        self.update_image(self.pil_nav_img.convert("RGB"))
+        self.map=self.pil_nav_img
+        self.update_image(self.map.convert("RGB"))
 
     def setup_ui(self):
         self.map_region = QVBoxLayout()
@@ -177,13 +178,13 @@ class ImageViewer(QWidget):
     @QtCore.pyqtSlot()
     def show_room(self, idx):
         overlay = Image.fromarray(recolor_room[self.room_map[:,:,idx].astype(int)])
-        map = Image.alpha_composite(self.pil_nav_img, overlay).convert("RGB")
+        map = Image.alpha_composite(self.map, overlay).convert("RGB")
         self.update_image(map)
 
     @QtCore.pyqtSlot()
     def show_objs(self, idx):
         overlay = Image.fromarray(recolor_object[self.obj_maps[:,:,idx].astype(int)])
-        map = Image.alpha_composite(self.pil_nav_img, overlay).convert("RGB")
+        map = Image.alpha_composite(self.map, overlay).convert("RGB")
         self.update_image(map)
 
 
