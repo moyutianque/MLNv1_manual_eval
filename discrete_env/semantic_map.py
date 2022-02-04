@@ -5,9 +5,12 @@ class semantic_map(object):
     def __init__(
         self, scene_name, resolution, 
         map_root="data/maps/gmap_floor1_mpp_0.05_channel_last_with_bounds",
-        pano_path=""
+        pano_path="",
+        pixel_in_meter=0.05
     ) -> None:
-        self.resolution = resolution
+        # NOTE: resolution is target discretized block length
+        self.discretize_step = resolution / pixel_in_meter
+
         self.nav_map, self.room_map, self.obj_maps, self.grid_dimensions, bounds \
             = get_maps(scene_name, map_root)
         
@@ -46,8 +49,11 @@ class semantic_map(object):
         """
         Return:
             grid vertex (N,2)
+
         """
-        pass
+        env_shape = (round(self.grid_dimensions[0]/self.discretize_step), round(self.grid_dimensions[1]/self.discretize_step))
+        # TODO: make sure what a discretized map looks like
+        return
     
 
     def discretize_point(self, grid_points):
@@ -57,7 +63,7 @@ class semantic_map(object):
         Return:
             discretized points (N,2) merged
         """
-        pass
+        return round(grid_points/self.discretize_step)
     
     def discretize_path(self):
         """
