@@ -88,12 +88,25 @@ def get_maps(scene_id, root_path):
     grid_dimensions = (nav_map.shape[0], nav_map.shape[1])
     return nav_map, room_map, obj_maps, grid_dimensions, bounds
 
+def load_panos(scene_name, pano_path):
+    """
+    Args:
+        scene_name
+        pano_path
+    Return:
+        panos [X * Y, K, K, 3]
+    """
+    pass
+
 def to_grid(
     realworld_x: float,
     realworld_y: float,
     grid_resolution: Tuple[int, int],
     lower_bound, upper_bound
 ) -> Tuple[int, int]:
+    """
+    single point implementation
+    """
     grid_size = (
         abs(upper_bound[2] - lower_bound[2]) / grid_resolution[0],
         abs(upper_bound[0] - lower_bound[0]) / grid_resolution[1],
@@ -108,6 +121,9 @@ def from_grid(
     grid_resolution: Tuple[int, int],
     lower_bound, upper_bound
 ) -> Tuple[float, float]:
+    """
+    single point implementation
+    """
     grid_size = (
         abs(upper_bound[2] - lower_bound[2]) / grid_resolution[0],
         abs(upper_bound[0] - lower_bound[0]) / grid_resolution[1],
@@ -116,3 +132,18 @@ def from_grid(
     realworld_y = lower_bound[0] + grid_y * grid_size[1]
     return realworld_x, realworld_y
 
+
+import timeit
+def execution_time(method):
+    """ decorator style """
+
+    def time_measure(*args, **kwargs):
+        ts = timeit.default_timer()
+        result = method(*args, **kwargs)
+        te = timeit.default_timer()
+
+        print(f'Excution time of method {method.__qualname__} is {te - ts} seconds.')
+        #print(f'Excution time of method {method.__name__} is {te - ts} seconds.')
+        return result
+
+    return time_measure
