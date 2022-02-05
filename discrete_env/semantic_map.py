@@ -1,4 +1,4 @@
-from utils.map_tools import get_maps, load_panos
+from utils.map_tools import get_maps, load_panos, get_raw_maps, shortest_path
 import numpy as np
 
 class semantic_map(object):
@@ -12,7 +12,7 @@ class semantic_map(object):
         self.discretize_step = resolution / pixel_in_meter
 
         self.nav_map, self.room_map, self.obj_maps, self.grid_dimensions, bounds \
-            = get_maps(scene_name, map_root)
+            = get_raw_maps(scene_name, map_root)
         
         upper_bound, lower_bound = bounds[0], bounds[1]
         self.lower_bound = lower_bound
@@ -34,6 +34,7 @@ class semantic_map(object):
         world_locs_z = np.zeros_like(world_locs_y)
         return np.hstack((world_locs_x, world_locs_y, world_locs_z))
     
+    '''
     def worldloc2gridmap(self, world_locs):
         """
         Args:
@@ -71,14 +72,20 @@ class semantic_map(object):
         output:   [(M,2)] *N
         """
         pass
-
+    '''
 
     def shortest_path(self, src_points, target_points):
         """
-        input:    src points (N,2)   target points(N,2)
+        input:    src points (2,)   target points(N,2)
         output:   [(M,2)] *N
         """
-        pass
+        solver= shortest_path(self.nav_map, self.obj_maps, src_points)
+
+        paths = []
+        for i in range(target_points.shape[0]):
+            path = solver.find_path_by_target(target_points[i,:])
+            paths.append(path)
+        return paths
     
     def get_panorama(self, grid_points):
         """
