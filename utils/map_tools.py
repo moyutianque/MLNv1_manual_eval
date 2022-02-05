@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 import math
 # import magnum as mn
-# import quaternion
+import quaternion
 from PIL import Image, ImageDraw
 import os
 action_mapping={
@@ -66,7 +66,9 @@ def euler_from_quaternion(w,x,y,z):
 #     cv2.drawContours(np_map, [agent_arrow], 0, (0,0,255,255), -1)
 
 def draw_agent(aloc, arot, np_map):
-    agent_orientation = euler_from_quaternion(*[arot[3], *arot[:3]])
+    arot_q = quaternion.from_float_array(np.array([arot[3], *arot[:3]]) )
+    agent_forward = quaternion.rotate_vectors(arot_q, np.array([0,0,-1.]))
+    agent_orientation = math.atan2(agent_forward[0], agent_forward[2])
     agent_arrow = get_contour_points( (aloc[1], aloc[0], -agent_orientation), size=15)
     cv2.drawContours(np_map, [agent_arrow], 0, (0,0,255,255), -1)
 
