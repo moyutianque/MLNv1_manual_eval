@@ -13,7 +13,7 @@ import time
 import gzip
 import json
 import random
-# random.seed(0)
+random.seed(0)
 from utils.map_tools import get_maps, simloc2maploc, draw_agent, draw_point, draw_path
 from PIL import Image
 import numpy as np

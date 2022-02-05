@@ -5,8 +5,8 @@ import h5py
 import numpy as np
 import cv2
 import math
-import magnum as mn
-import quaternion
+# import magnum as mn
+# import quaternion
 from PIL import Image, ImageDraw
 import os
 action_mapping={
@@ -32,14 +32,42 @@ def get_contour_points(pos, size):
 
     return np.array([pt1, pt2, pt3, pt4])
 
+import math
+ 
+def euler_from_quaternion(w,x,y,z):
+    """
+    Convert a quaternion into euler angles (roll, pitch, yaw)
+    roll is rotation around x in radians (counterclockwise)
+    pitch is rotation around y in radians (counterclockwise)
+    yaw is rotation around z in radians (counterclockwise)
+    """
+    # t0 = +2.0 * (w * x + y * z)
+    # t1 = +1.0 - 2.0 * (x * x + y * y)
+    # roll_x = math.atan2(t0, t1)
+    
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    pitch_y = math.asin(t2)
+    
+    # t3 = +2.0 * (w * z + x * y)
+    # t4 = +1.0 - 2.0 * (y * y + z * z)
+    # yaw_z = math.atan2(t3, t4)
+    
+    # return roll_x, pitch_y, yaw_z # in radians
+    return pitch_y
+
+# def draw_agent(aloc, arot, np_map):
+#     arot = quaternion.from_float_array(np.array([arot[3], *arot[:3]]) )
+#     # arot = quaternion.from_float_array(np.array(arot))
+#     agent_forward = mn.Quaternion(arot.imag, arot.real).transform_vector(mn.Vector3(0, 0, -1.0))
+#     agent_orientation = math.atan2(agent_forward[0], agent_forward[2])
+#     agent_arrow = get_contour_points( (aloc[1], aloc[0], agent_orientation), size=15)
+#     cv2.drawContours(np_map, [agent_arrow], 0, (0,0,255,255), -1)
 
 def draw_agent(aloc, arot, np_map):
-    arot = quaternion.from_float_array(np.array([arot[3], *arot[:3]]) )
-    # arot = quaternion.from_float_array(np.array(arot))
-    agent_forward = mn.Quaternion(arot.imag, arot.real).transform_vector(mn.Vector3(0, 0, -1.0))
-    agent_orientation = math.atan2(agent_forward[0], agent_forward[2])
-
-    agent_arrow = get_contour_points( (aloc[1], aloc[0], agent_orientation), size=15)
+    agent_orientation = euler_from_quaternion(*[arot[3], *arot[:3]])
+    agent_arrow = get_contour_points( (aloc[1], aloc[0], -agent_orientation), size=15)
     cv2.drawContours(np_map, [agent_arrow], 0, (0,0,255,255), -1)
 
 def draw_point(pil_img, x, y, point_size, color):
@@ -85,6 +113,17 @@ def get_maps(scene_id, root_path):
             [[255, 255, 255, 255], [128, 128, 128, 255], [0, 0, 0, 255]], dtype=np.uint8
     )
     nav_map = recolor_map[nav_map]
+    grid_dimensions = (nav_map.shape[0], nav_map.shape[1])
+    return nav_map, room_map, obj_maps, grid_dimensions, bounds
+
+def get_raw_maps(scene_id, root_path):
+    gmap_path = osp.join(root_path, f"{scene_id}_gmap.h5")
+    with h5py.File(gmap_path, "r") as f:
+        nav_map  = f['nav_map'][()]
+        room_map = f['room_map'][()]
+        obj_maps = f['obj_maps'][()]
+        bounds = f['bounds'][()]
+
     grid_dimensions = (nav_map.shape[0], nav_map.shape[1])
     return nav_map, room_map, obj_maps, grid_dimensions, bounds
 
