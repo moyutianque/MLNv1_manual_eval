@@ -3,7 +3,7 @@ roomidx2name = {
     19: 'office', 
     12: 'hallway',
     15: 'kitchen', 
-    29: 'other room', 
+    29: 'room', 
     1: 'classroom', 
     18: 'lounge', 
     13: 'library', 
@@ -44,7 +44,7 @@ semantic_sensor_40cat = {
     9: "sofa",
     10:"bed",
     11:"curtain",
-    12:"drawer chest",
+    12:"drawer",
     13:"plant",
     14:"sink",
     15:"stairs",
@@ -73,3 +73,80 @@ semantic_sensor_40cat = {
     38:"objects",
     39:"misc"
 }
+
+obj_merged_dict = {
+    "wall": "wall",
+    "floor": "floor",
+    "chair": "seating",
+    "door": "door",
+    "table": "table",
+    "picture": "picture",
+    "cabinet": "closet", # 柜子
+    "cushion": "seating",
+    "window": "window",
+    "sofa": "seating",
+    "bed": "bed",
+    "curtain": "curtain",
+    "drawer": "closet",
+    "plant": "plant",
+    "sink": "sink",
+    "toilet": "toilet",
+    "stool": "seating",
+    "towel": "towel",
+    "mirror": "mirror",
+    "tv_monitor": "tv_monitor",
+    "shower": "shower",
+    "column": "column",
+    "bathtub": "bathtub",
+    "counter": "counter",
+    "fireplace": "fireplace",
+    "lighting": "lighting",
+    "beam": "lighting",
+    "railing": "railing",
+    "shelving": "counter",
+    "blinds": "window",
+    "gym_equipment": "gym_equipment",
+    "seating": "seating",
+    "board_panel": "board_panel",
+    "furniture": "counter",
+    "appliances": "appliances",
+    "clothes": "clothes",
+}
+
+room_merged_dict = {
+    'meetingroom': 'office', 
+    'office': 'office', 
+    'hallway': 'hallway',
+    'kitchen': 'kitchen', 
+    'room': 'room', 
+    'classroom': 'classroom', 
+    'lounge': 'room', 
+    'library': 'library', 
+    'dining booth': 'dining room', 
+    'rec/game': 'room', 
+    'spa/sauna': 'room', 
+    'stairs': 'stairs', 
+    'bathroom': 'bathroom', 
+    'dining room': 'dining room', 
+    'familyroom': 'room', 
+    'living room': 'living room', 
+    'lobby': 'lobby', 
+    'bedroom': 'bedroom', 
+    'laundryroom': 'laundryroom', 
+    'closet': 'closet', 
+    'toilet': 'toilet',  # consider to remove
+    'terrace': "balcony", 
+    'balcony': 'balcony', 
+    'toolroom': 'room', 
+    'junk': 'junk', 
+    'gym': 'gym', 
+    'tv': 'room', 
+    'garage': 'garage', 
+    'bar': 'kitchen', 
+    'outdoor': 'outdoor'
+}
+
+room_set = {name: i for i, name in enumerate(sorted(list(set(room_merged_dict.values()))))}
+objs_set = set(obj_merged_dict.values())
+objs_set.remove('closet')
+objs_set = {name: i for i, name in enumerate(sorted(list(objs_set)))}

@@ -8,10 +8,13 @@ import math
 # import magnum as mn
 import quaternion
 from PIL import Image, ImageDraw
+from constants import obj_merged_dict, room_merged_dict, roomidx2name, semantic_sensor_40cat, room_set, objs_set
 import os
 action_mapping={
     0:"stop",1:"forward",2:"left",3:"right"
 }
+
+
 def get_contour_points(pos, size):
     x, y, o = pos
     pt1 = (int(x),
@@ -103,12 +106,16 @@ def simloc2maploc(aloc, grid_dimensions, upper_bound, lower_bound):
     )
     return agent_grid_pos
 
-def get_maps(scene_id, root_path):
+def get_maps(scene_id, root_path, merged):
     gmap_path = osp.join(root_path, f"{scene_id}_gmap.h5")
     with h5py.File(gmap_path, "r") as f:
         nav_map  = f['nav_map'][()]
-        room_map = f['room_map'][()] > 0
-        obj_maps = f['obj_maps'][()] > 0
+        room_map = f['room_map'][()] 
+        obj_maps = f['obj_maps'][()] 
+        if merged:
+            room_map, obj_maps=merge_maps(room_map, obj_maps)
+        obj_maps = obj_maps > 0
+        room_map = room_map > 0
         bounds = f['bounds'][()]
 
     recolor_map = np.array(
@@ -172,6 +179,38 @@ def from_grid(
     realworld_x = lower_bound[2] + grid_x * grid_size[0]
     realworld_y = lower_bound[0] + grid_y * grid_size[1]
     return realworld_x, realworld_y
+
+
+def merge_maps(room_map, obj_maps):
+    """
+    first merge room maps
+
+    move closet maps from obj to rooms
+
+    Return:
+        return merged maps with indexing list
+    """
+    new_room_map = np.zeros((room_map.shape[0], room_map.shape[1], len(room_set)))
+    new_obj_map = np.zeros((obj_maps.shape[0], obj_maps.shape[1], len(objs_set)))
+
+    for idx, room_name in roomidx2name.items():
+        new_room_map[:,:,room_set[room_merged_dict[room_name]]] = \
+            ((new_room_map[:,:,room_set[room_merged_dict[room_name]]]>0) ^ (room_map[:,:,idx]>0) ) \
+            * new_room_map[:,:,room_set[room_merged_dict[room_name]]] + room_map[:,:,idx]
+    
+    for idx, obj_name in semantic_sensor_40cat.items():
+        if obj_name in ["stairs", "ceiling", "misc", "objects"]:
+            continue
+        if obj_name in room_merged_dict or obj_merged_dict[obj_name] == 'closet':
+            new_room_map[:,:,room_set[obj_merged_dict[obj_name]]] = \
+                ((new_room_map[:,:,room_set[obj_merged_dict[obj_name]]]>0) ^ (obj_maps[:,:,idx]>0) ) \
+                * new_room_map[:,:,room_set[obj_merged_dict[obj_name]]] + obj_maps[:,:,idx]
+        else:
+            new_obj_map[:,:,objs_set[obj_merged_dict[obj_name]]] = \
+                ((new_obj_map[:,:,objs_set[obj_merged_dict[obj_name]]]>0) ^ (obj_maps[:,:,idx]>0) ) \
+                * new_obj_map[:,:,objs_set[obj_merged_dict[obj_name]]] + obj_maps[:,:,idx]
+    return new_room_map, new_obj_map
+
 
 
 import timeit

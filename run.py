@@ -3,7 +3,7 @@ from PyQt5 import QtCore
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QLabel, QPushButton, QApplication, QGridLayout, QHBoxLayout
 from matplotlib.pyplot import draw
-from constants import semantic_sensor_40cat, roomidx2name
+from constants import semantic_sensor_40cat, roomidx2name, room_set, objs_set
 import os.path as osp
 import copy
 import os
@@ -25,12 +25,19 @@ recolor_object = np.array(
         )
 TOT_SAMPLES=20
 
-ordered_room_name = sorted(roomidx2name.items(), key=lambda item: item[1])
-ordered_obj_name = sorted(semantic_sensor_40cat.items(), key=lambda item: item[1])
+
 class ImageViewer(QWidget):
 
-    def __init__(self, annt_root, split):
+    def __init__(self, annt_root, split, merged = True):
         QWidget.__init__(self)
+        self.merged = merged
+        if self.merged:
+            self.ordered_room_name = sorted({v:k for k,v in room_set.items()}.items(), key=lambda item: item[1])
+            self.ordered_obj_name = sorted({v:k for k,v in objs_set.items()}.items(), key=lambda item: item[1])
+        else:
+            self.ordered_room_name = sorted(roomidx2name.items(), key=lambda item: item[1])
+            self.ordered_obj_name = sorted(semantic_sensor_40cat.items(), key=lambda item: item[1])
+        
         self.setup_ui()
         out_root = f'out/manual_eval_{int(time.time())}'
         os.makedirs(out_root, exist_ok=True)
@@ -70,8 +77,10 @@ class ImageViewer(QWidget):
         start_position = episode['start_position']
         end_position = episode['goals'][0]['position']
 
-        nav_map, self.room_map, self.obj_maps, grid_dimensions, bounds = get_maps(scene_name, self.map_root)
+        nav_map, self.room_map, self.obj_maps, grid_dimensions, bounds\
+             = get_maps(scene_name, self.map_root, merged=self.merged)
         
+
         upper_bound, lower_bound = bounds[0], bounds[1]
         # Agent positions
         start_grid_pos = simloc2maploc(
@@ -144,21 +153,26 @@ class ImageViewer(QWidget):
         for i in range(6):
             for j in range(5):
                 idx = i*5+j
-                button = QPushButton(ordered_room_name[idx][1])
-                button.setFixedWidth(120)
-                # NOTE: very important, otherwise the idx will be replace by the last assignment
-                button.clicked.connect(lambda checked, arg=ordered_room_name[idx][0]: self.show_room(arg))
-                self.room_layout.addWidget(button, i+1, j)
+                try:
+                    button = QPushButton(self.ordered_room_name[idx][1])
+                    button.setFixedWidth(120)
+                    # NOTE: very important, otherwise the idx will be replace by the last assignment
+                    button.clicked.connect(lambda checked, arg=self.ordered_room_name[idx][0]: self.show_room(arg))
+                    self.room_layout.addWidget(button, i+1, j)
+                except:
+                    break
 
         # object buttons
         for i in range(8):
             for j in range(5):
                 idx = i*5+j
-                button = QPushButton(ordered_obj_name[idx][1])
-                button.setFixedWidth(120)
-                button.clicked.connect(lambda checked, arg=ordered_obj_name[idx][0]: self.show_objs(arg))
-                self.obj_layout.addWidget(button, i+1, j)
-
+                try:
+                    button = QPushButton(self.ordered_obj_name[idx][1])
+                    button.setFixedWidth(120)
+                    button.clicked.connect(lambda checked, arg=self.ordered_obj_name[idx][0]: self.show_objs(arg))
+                    self.obj_layout.addWidget(button, i+1, j)
+                except:
+                    break
         self.button_layouts.addLayout(self.room_layout)
         self.button_layouts.addLayout(self.obj_layout)
 
