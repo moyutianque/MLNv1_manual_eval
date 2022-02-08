@@ -1,3 +1,5 @@
+from matplotlib import cm
+import numpy as np
 roomidx2name = {
     17: 'meetingroom', 
     19: 'office', 
@@ -113,6 +115,98 @@ obj_merged_dict = {
     "clothes": "clothes",
 }
 
+
+obj_word_mapping = {
+    "wall": "wall",
+    "floor": "floor",
+    "chair": "seating",
+    "door": "door",
+    "table": "table",
+    'desk': 'table',
+    "picture": "picture",
+    "cabinet": "closet", # 柜子
+    "cushion": "seating",
+    "window": "window",
+    "sofa": "seating",
+    "bed": "bed",
+    "curtain": "curtain",
+    "drawer": "closet",
+    'shelves': 'closet',
+    "plant": "plant",
+    "flower": "plant",
+    "sink": "sink",
+    "toilet": "toilet",
+    "stool": "seating",
+    "towel": "towel",
+    "mirror": "mirror",
+    "tv monitor": "tv_monitor",
+    "shower": "shower",
+    "column": "column",
+    "pillars": "column",
+    "bathtub": "bathtub",
+    "counter": "counter",
+    "fireplace": "fireplace",
+    "lighting": "lighting",
+    "beam": "lighting",
+    "railing": "railing",
+    "shelving": "counter",
+    "blinds": "window",
+    "gym equipment": "gym_equipment",
+    'treadmill': 'gym_equipment',
+    "seating": "seating",
+    "board panel": "board_panel",
+    "furniture": "counter",
+    "appliances": "appliances",
+    "clothes": "clothes",
+    'bannister': 'railing'
+}
+
+room_word_mapping = {
+    'meetingroom': 'office', 
+    'conferenceroom': 'office',
+    'office': 'office', 
+    'hallway': 'hallway',
+    'doorway': 'hallway',
+    'kitchen': 'kitchen', 
+    'room': 'room', 
+    'classroom': 'classroom', 
+    'lounge': 'room', 
+    'library': 'library', 
+    'dining booth': 'dining room', 
+    'rec': 'room',
+    'game': 'room', 
+    'spa':'room',
+    'sauna': 'room', 
+    'massage room': 'room',
+    'stairs': 'stairs', 
+    'bathroom': 'bathroom', 
+    'dining room': 'dining room', 
+    'familyroom': 'room', 
+    'living room': 'living room', 
+    'lobby': 'lobby', 
+    'entryway': 'lobby',
+    'foyer': 'lobby',
+    'bedroom': 'bedroom', 
+    'laundryroom': 'laundryroom', 
+    'mudroom': 'laundryroom',
+    'closet': 'closet', 
+    'toilet': 'toilet',  # consider to remove
+    'terrace': "balcony", 
+    'porch': 'balcony',
+    'deck': 'balcony',
+    'balcony': 'balcony', 
+    'toolroom': 'room', 
+    'utilityroom': 'room',
+    'junk': 'junk', 
+    'gym': 'gym', 
+    'workout': 'gym',
+    'exercise': 'gym',
+    'tv': 'room', 
+    'garage': 'garage', 
+    'bar': 'kitchen', 
+    'outdoor': 'outdoor'  
+}
+
 room_merged_dict = {
     'meetingroom': 'office', 
     'office': 'office', 
@@ -150,3 +244,7 @@ room_set = {name: i for i, name in enumerate(sorted(list(set(room_merged_dict.va
 objs_set = set(obj_merged_dict.values())
 objs_set.remove('closet')
 objs_set = {name: i for i, name in enumerate(sorted(list(objs_set)))}
+
+
+tab10_colors_rgb = (np.array(cm.get_cmap('tab10').colors)*255).astype(np.uint8)
+tab10_colors_rgba =  np.concatenate([tab10_colors_rgb, np.ones((10,1), dtype=np.uint8)*255], axis=1)

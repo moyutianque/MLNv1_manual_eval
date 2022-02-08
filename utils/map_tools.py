@@ -1,14 +1,19 @@
+from turtle import color
 import numpy as np
 from typing import Any, Tuple, Sequence
 import os.path as osp
 import h5py
 import numpy as np
 import cv2
+import sys
+sys.setrecursionlimit(10000)
 import math
 # import magnum as mn
 import quaternion
-from PIL import Image, ImageDraw
-from constants import obj_merged_dict, room_merged_dict, roomidx2name, semantic_sensor_40cat, room_set, objs_set
+from PIL import Image, ImageDraw, ImageFont
+font = ImageFont.truetype("./utils/arial.ttf", 16)
+
+from constants import obj_merged_dict, room_merged_dict, roomidx2name, semantic_sensor_40cat, room_set, objs_set, tab10_colors_rgba
 from queue import PriorityQueue
 import os
 action_mapping={
@@ -76,28 +81,40 @@ def draw_agent(aloc, arot, np_map):
     agent_arrow = get_contour_points( (aloc[1], aloc[0], agent_orientation), size=15)
     cv2.drawContours(np_map, [agent_arrow], 0, (0,0,255,255), -1)
 
-def draw_point(pil_img, x, y, point_size, color):
+def draw_point(pil_img, x, y, point_size, color, text=None):
     drawer = ImageDraw.Draw(pil_img, 'RGBA')
     drawer.ellipse((x-point_size, y-point_size, x+point_size, y+point_size), fill=color)
+    if text is not None:
+        drawer.text((x+point_size, y-point_size), text, font=font, fill=color)
 
-def draw_path(np_map, gt_annt, grid_dimensions, upper_bound, lower_bound):
-    locations = gt_annt['locations']
-    if os.environ.get('DEBUG', False): 
-        print('\033[92m'+'DEBUG mode:'+'\033[0m')
-        print("GT Action sequence: ", [action_mapping[act] for act in gt_annt['actions']])
+def draw_path(np_map, gt_annt, grid_dimensions, upper_bound, lower_bound, is_grid=False, color=(0,128,128,255)):
+    if isinstance(gt_annt, dict):
+        locations = gt_annt['locations']
+        if os.environ.get('DEBUG', False): 
+            print('\033[92m'+'DEBUG mode:'+'\033[0m')
+            print("GT Action sequence: ", [action_mapping[act] for act in gt_annt['actions']])
+    elif isinstance(gt_annt, list):
+        locations = gt_annt
+    else:
+        raise NotImplemented()
 
     for i in range(1, len(locations)):
-        start_grid_pos = simloc2maploc(
-            locations[i-1], grid_dimensions, upper_bound, lower_bound
-        )
-        end_grid_pos = simloc2maploc(
-            locations[i], grid_dimensions, upper_bound, lower_bound
-        )
+
+        if not is_grid:
+            start_grid_pos = simloc2maploc(
+                locations[i-1], grid_dimensions, upper_bound, lower_bound
+            )
+            end_grid_pos = simloc2maploc(
+                locations[i], grid_dimensions, upper_bound, lower_bound
+            )
+        else:
+            start_grid_pos = locations[i-1]
+            end_grid_pos = locations[i]
         cv2.line(
             np_map,
             (start_grid_pos[1], start_grid_pos[0]), # use x,y coord order
             (end_grid_pos[1], end_grid_pos[0]),
-            color=(0,128,128,255),
+            color=color,
             thickness=2,
         )
 
@@ -115,23 +132,26 @@ def get_maps(scene_id, root_path, merged):
         obj_maps = f['obj_maps'][()] 
         if merged:
             room_map, obj_maps=merge_maps(room_map, obj_maps)
-        obj_maps = obj_maps > 0
-        room_map = room_map > 0
         bounds = f['bounds'][()]
 
+    grid_dimensions = (nav_map.shape[0], nav_map.shape[1])
+    return nav_map, room_map, obj_maps, grid_dimensions, bounds
+
+def colorize_nav_map(nav_map):
     recolor_map = np.array(
             [[255, 255, 255, 255], [128, 128, 128, 255], [0, 0, 0, 255]], dtype=np.uint8
     )
     nav_map = recolor_map[nav_map]
-    grid_dimensions = (nav_map.shape[0], nav_map.shape[1])
-    return nav_map, room_map, obj_maps, grid_dimensions, bounds
+    return nav_map
 
-def get_raw_maps(scene_id, root_path):
+def get_raw_maps(scene_id, root_path, merged):
     gmap_path = osp.join(root_path, f"{scene_id}_gmap.h5")
     with h5py.File(gmap_path, "r") as f:
         nav_map  = f['nav_map'][()]
         room_map = f['room_map'][()]
         obj_maps = f['obj_maps'][()]
+        if merged:
+            room_map, obj_maps=merge_maps(room_map, obj_maps)
         bounds = f['bounds'][()]
 
     grid_dimensions = (nav_map.shape[0], nav_map.shape[1])
@@ -213,6 +233,54 @@ def merge_maps(room_map, obj_maps):
     return new_room_map, new_obj_map
 
 
+def draw_candidates(map, start_grid_pos, size, order):
+    """
+    Args:
+        map: single instance level map
+    """
+    ins_set = set(map.flatten().tolist())
+    ins_set.remove(0)
+    overlay = Image.new('RGBA', size, (255,0,0)+(0,))
+    for i, ins in enumerate(ins_set):
+        coords = np.where(map == ins)
+        #coords = tuple(zip(*coords))
+        cr, cc = round(np.median(coords[0])), round(np.median(coords[1]))
+        draw_point(overlay, cc, cr, 8, color=tuple(tab10_colors_rgba[order%10]), text=str(order))
+    return overlay
+
+
+def create_candidates(nav_map, obj_maps, step_size=84):
+    candidates = []
+    # 6/0.05 = 120
+    # sqrt(84 ** 2 * 2) < 120
+    r = 8
+    xs = [0,0, r, -r,r,-r,r,-r]
+    ys = [r,-r,0,0,r,-r,-r,r]
+
+    for i in range(step_size//2, nav_map.shape[0], step_size):
+        for j in range(step_size//2, nav_map.shape[1], step_size):
+            # if nav_map[i,j] > 0 or obj_maps[i,j,1]>0:
+            if nav_map[i,j] > 0:
+                candidates.append((i, j))
+            else:
+                for t in zip(xs, ys):
+                    newx = np.clip(i+t[0], 0, nav_map.shape[0])
+                    newy = np.clip(j+t[1], 0, nav_map.shape[1])
+                    #if nav_map[newx,newy] > 0 or obj_maps[newx,newy,1]>0:
+                    if nav_map[newx,newy] > 0:
+                        candidates.append((newx, newy))
+                        break
+    return candidates
+
+
+def get_possible_paths(nav_map, obj_maps, start_point):
+    solver = shortest_path(nav_map, obj_maps, start_point, radius=1, step=1)
+    candidate_targets = create_candidates(nav_map, obj_maps)
+    print(candidate_targets)
+    candidate_pathes = []
+    for target in candidate_targets:
+        candidate_pathes.append(solver.find_path_by_target(target).tolist())
+    return candidate_targets, candidate_pathes
 
 import timeit
 def execution_time(method):
@@ -229,15 +297,11 @@ def execution_time(method):
 
     return time_measure
 
-
-
-
 class shortest_path:
-    def __init__(self, nav_map, obj_maps, start_point, radius = 6,step =3):
+    def __init__(self, nav_map, obj_maps, start_point, radius = 1,step =1):
         dims = nav_map.shape
         get_graph_id_fn = lambda point:point[0]*dims[1] + point[1]
         get_coords_fn = lambda graph_id:(graph_id//dims[1], graph_id%dims[1])
-
         start_vertex=get_graph_id_fn(start_point)
         D = {v:float('inf') for v in range(dims[0]*dims[1])}
         prevs =  {v:-1 for v in range(dims[0]*dims[1])}
@@ -247,8 +311,9 @@ class shortest_path:
         pq.put((0, start_vertex))
 
         graph_visited = set()
-        xs = [0,0, 1, -1,1,-1]
-        ys = [1,-1,0,0,1,-1]
+        xs = [0,0, 1, -1,1,-1,1,-1]
+        ys = [1,-1,0,0,1,-1,-1,1]
+        value = [1,1,1,1,1.41421,1.41421,1.41421,1.41421]
         
         def check_valid(point):
             if point[0]<0 or point[0]>=dims[0] or point[1]<0 or point[1]>=dims[1]:
@@ -262,26 +327,28 @@ class shortest_path:
             current_point = get_coords_fn(current_vertex)
 
             neighbors = []
-            for i in range(6):
+            for i in range(8):
                 new_point = (current_point[0]+xs[i]*step, current_point[1]+ys[i]*step)
                 if not check_valid(new_point):
                     continue
                 flag = False
-                for j in range(6):
+                for j in range(8):
                     if not check_valid((new_point[0]+xs[j]*radius, new_point[1]+ys[j]*radius)):
                         flag = True
                         break
-                    if nav_map[new_point[0]+xs[j]*radius, new_point[1]+ys[j]*radius] <= 0 \
-                           and obj_maps[new_point[0]+xs[j]*radius, new_point[1]+ys[j]*radius, 1] <= 0:
+                    if nav_map[new_point[0]+xs[j], new_point[1]+ys[j]] <= 0 \
+                        and obj_maps[new_point[0]+xs[j]*radius, new_point[1]+ys[j]*radius, 1] <= 0:
                         flag = True
                         break
                 if not flag:
-                    neighbors.append(get_graph_id_fn(new_point))
+                    neighbors.append((get_graph_id_fn(new_point),value[i]))
 
             for neighbor in neighbors:
-                if neighbor not in graph_visited:
+                if neighbor[0] not in graph_visited:
+                    dis = neighbor[1]
+                    neighbor = neighbor[0]
                     old_cost = D[neighbor]
-                    new_cost = D[current_vertex] + 1*step
+                    new_cost = D[current_vertex] + dis*step
                     if new_cost < old_cost:
                         pq.put((new_cost, neighbor))
                         D[neighbor] = new_cost
@@ -297,7 +364,6 @@ class shortest_path:
             if self.prevs[v]>0:
                 path.append(self.get_coords_fn(self.prevs[v]))
                 find_path(self.prevs[v], path)
-
         path = [tar_point]
         find_path(self.get_graph_id_fn(tar_point), path)
         return np.array(path[::-1])

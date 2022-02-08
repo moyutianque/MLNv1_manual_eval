@@ -13,8 +13,9 @@ import time
 import gzip
 import json
 import random
-random.seed(0)
-from utils.map_tools import get_maps, simloc2maploc, draw_agent, draw_point, draw_path
+import string
+random.seed(1)
+from utils.map_tools import get_maps, simloc2maploc, draw_agent, draw_point, draw_path, get_possible_paths, colorize_nav_map
 from PIL import Image
 import numpy as np
 recolor_room = np.array(
@@ -24,7 +25,7 @@ recolor_object = np.array(
             [[255, 255, 255, 0], [255, 128, 0, 200]], dtype=np.uint8
         )
 TOT_SAMPLES=20
-
+direction_list={'forward', 'straight', 'turn', 'left', 'right', 'stop', 'wait'}
 
 class ImageViewer(QWidget):
 
@@ -67,10 +68,13 @@ class ImageViewer(QWidget):
         self.ep_id = episode["episode_id"]
         gt_annt = self.gt_json[str(self.ep_id)]
 
-        scene_name = episode['scene_id'].split('/')[1]
+        scene_name = episode['scene_id'].replace('.',' ').split('/')[1]
         instruction = episode['instruction']['instruction_text']
 
-        self.text.setText("<b>Instruction:</b>" +instruction+"<br>[start from blue to red point]")
+        language_action_seq = instruction.translate(str.maketrans('', '', string.punctuation)).strip().split()
+        language_action_seq = list(filter(lambda k: k in direction_list, language_action_seq))
+
+        self.text.setText(f"<b>Instruction of ep_{self.ep_id}_scene_{scene_name}:</b>" +instruction+'<br>'+str(language_action_seq)+"<br>[start from blue to red point]")
         self.text.setAlignment(QtCore.Qt.AlignLeft)
         self.text.setWordWrap(True)
 
@@ -79,18 +83,25 @@ class ImageViewer(QWidget):
 
         nav_map, self.room_map, self.obj_maps, grid_dimensions, bounds\
              = get_maps(scene_name, self.map_root, merged=self.merged)
-        
+        self.room_map = self.room_map > 0
+        self.obj_maps = self.obj_maps > 0
+
+        self.nav_map = np.copy(nav_map)
+        nav_map = colorize_nav_map(nav_map)
 
         upper_bound, lower_bound = bounds[0], bounds[1]
+        self.grid_dimensions =grid_dimensions
+        self.upper_bound = upper_bound
+        self.lower_bound = lower_bound
         # Agent positions
         start_grid_pos = simloc2maploc(
             start_position, grid_dimensions, upper_bound, lower_bound
         )
+        self.start_point = start_grid_pos
         end_grid_pos = simloc2maploc(
             end_position, grid_dimensions, upper_bound, lower_bound
         )
         end_radius = episode['goals'][0]['radius']
-        
         # Draw nav map
         draw_agent(start_grid_pos, episode['start_rotation'], nav_map)
         self.map = Image.fromarray(np.copy(nav_map))
@@ -112,6 +123,25 @@ class ImageViewer(QWidget):
     
     def show_ans(self):
         self.map=self.pil_nav_img
+        self.update_image(self.map.convert("RGB"))
+
+    def show_candidate_pathes(self):
+        overlay_np = np.zeros((self.nav_map.shape[0], self.nav_map.shape[1], 4), dtype=np.uint8)
+        targets, pathes = get_possible_paths(self.nav_map>0, self.obj_maps, self.start_point)
+
+        for path in pathes:
+            if len(path)==1:
+                continue
+            draw_path(
+                overlay_np, path, self.grid_dimensions, 
+                self.upper_bound, self.lower_bound ,is_grid=True, color=(0,200,200,255)
+            )
+
+        overlay = Image.fromarray(overlay_np)
+        for target in targets:
+            draw_point(overlay, target[1], target[0], 3, (255, 200, 200, 255))
+        
+        self.map = Image.alpha_composite(self.map, overlay)
         self.update_image(self.map.convert("RGB"))
 
     def setup_ui(self):
@@ -137,11 +167,15 @@ class ImageViewer(QWidget):
         button_ans.clicked.connect(lambda: self.show_ans())
         self.map_region.addWidget(button_ans)
 
+        button_candidate = QPushButton("Show candidate paths")
+        button_candidate.clicked.connect(lambda: self.show_candidate_pathes())
+        self.map_region.addWidget(button_candidate)
+
         button_next = QPushButton("Next episode")
         button_next.clicked.connect(lambda: self.reset_ep())
         self.map_region.addWidget(button_next)
 
-        self.button_layouts = QVBoxLayout() 
+        self.button_layouts = QVBoxLayout()
         self.room_layout = QGridLayout()
         room_label = QLabel("<b>Room Map buttons</b>")
         self.room_layout.addWidget(room_label, 0, 0, 1, 6, QtCore.Qt.AlignLeft)
@@ -210,6 +244,6 @@ class ImageViewer(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    viewer = ImageViewer(annt_root='./data', split="train")
+    viewer = ImageViewer(annt_root='./data', split="train", merged=False)
     viewer.show()
     app.exec_()
