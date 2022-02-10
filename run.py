@@ -14,8 +14,9 @@ import gzip
 import json
 import random
 import string
-random.seed(1)
+random.seed(0)
 from utils.map_tools import get_maps, simloc2maploc, draw_agent, draw_point, draw_path, get_possible_paths, colorize_nav_map
+from utils.instance_process import get_surrounding_objs, draw_instances, get_room_compass, draw_room_instances
 from PIL import Image
 import numpy as np
 recolor_room = np.array(
@@ -81,10 +82,11 @@ class ImageViewer(QWidget):
         start_position = episode['start_position']
         end_position = episode['goals'][0]['position']
 
-        nav_map, self.room_map, self.obj_maps, grid_dimensions, bounds\
+        nav_map, room_map, obj_maps, grid_dimensions, bounds\
              = get_maps(scene_name, self.map_root, merged=self.merged)
-        self.room_map = self.room_map > 0
-        self.obj_maps = self.obj_maps > 0
+
+        self.room_map = room_map > 0
+        self.obj_maps = obj_maps > 0
 
         self.nav_map = np.copy(nav_map)
         nav_map = colorize_nav_map(nav_map)
@@ -110,19 +112,37 @@ class ImageViewer(QWidget):
         draw_path(nav_map, gt_annt, grid_dimensions, upper_bound, lower_bound)
 
         # Draw answers (ground truth path and end position)
-        self.pil_nav_img = Image.fromarray(nav_map)
+        pil_nav_img = Image.fromarray(nav_map)
         #draw_point(self.pil_nav_img, start_grid_pos[1], start_grid_pos[0], point_size=10, color=(0, 0, 255, 255))
-        draw_point(self.pil_nav_img, end_grid_pos[1], end_grid_pos[0], point_size=10, color=(255, 0, 0, 255))
-        overlay = Image.new('RGBA', self.pil_nav_img.size, (255,0,0)+(0,))
+        draw_point(pil_nav_img, end_grid_pos[1], end_grid_pos[0], point_size=10, color=(255, 0, 0, 255))
+        overlay = Image.new('RGBA', pil_nav_img.size, (255,0,0)+(0,))
         draw_point(overlay, end_grid_pos[1], end_grid_pos[0], point_size=int(end_radius/0.05), color=(255, 0, 0, 50))
+
+        self.gt_path = Image.alpha_composite(pil_nav_img, overlay)
+
+        # show surrounding objects
+        result_dict, relative_dict = get_surrounding_objs(
+            obj_maps, self.nav_map, (start_grid_pos[0], start_grid_pos[1], episode['start_rotation']), 
+            3, floor_idx=1
+        )
+        # self.start_instances = draw_instances(result_dict, (start_grid_pos[0], start_grid_pos[1], episode['start_rotation']), self.map.size)
+        #self.start_instances = draw_instances(relative_dict, (start_grid_pos[0], start_grid_pos[1], episode['start_rotation']), self.map.size)
         
-        self.pil_nav_img = Image.alpha_composite(self.pil_nav_img, overlay)
-        #self.update_image(self.pil_nav_img.convert("RGB"))
-    
+        # Show room compass
+        room_satus = get_room_compass(
+            room_map, self.nav_map, (start_grid_pos[0], start_grid_pos[1], episode['start_rotation']), 
+            radius=10, num_chunks=8
+        )
+        self.start_instances = draw_room_instances(room_satus, (start_grid_pos[0], start_grid_pos[1], episode['start_rotation']), self.map.size)
+
         self.cnt += 1
     
+    def show_surround_points(self):
+        self.map = Image.alpha_composite(self.map, self.start_instances)
+        self.update_image(self.map.convert("RGB"))
+
     def show_ans(self):
-        self.map=self.pil_nav_img
+        self.map = Image.alpha_composite(self.map, self.gt_path)
         self.update_image(self.map.convert("RGB"))
 
     def show_candidate_pathes(self):
@@ -170,6 +190,10 @@ class ImageViewer(QWidget):
         button_candidate = QPushButton("Show candidate paths")
         button_candidate.clicked.connect(lambda: self.show_candidate_pathes())
         self.map_region.addWidget(button_candidate)
+
+        button_surround = QPushButton("Show start surrounding")
+        button_surround.clicked.connect(lambda: self.show_surround_points())
+        self.map_region.addWidget(button_surround)
 
         button_next = QPushButton("Next episode")
         button_next.clicked.connect(lambda: self.reset_ep())

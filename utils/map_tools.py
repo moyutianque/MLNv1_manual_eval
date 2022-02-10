@@ -11,7 +11,7 @@ import math
 # import magnum as mn
 import quaternion
 from PIL import Image, ImageDraw, ImageFont
-font = ImageFont.truetype("./utils/arial.ttf", 16)
+font = ImageFont.truetype("./utils/arial.ttf", 18)
 
 from constants import obj_merged_dict, room_merged_dict, roomidx2name, semantic_sensor_40cat, room_set, objs_set, tab10_colors_rgba
 from queue import PriorityQueue
@@ -74,10 +74,20 @@ def euler_from_quaternion(w,x,y,z):
 #     agent_arrow = get_contour_points( (aloc[1], aloc[0], agent_orientation), size=15)
 #     cv2.drawContours(np_map, [agent_arrow], 0, (0,0,255,255), -1)
 
-def draw_agent(aloc, arot, np_map):
+def get_agent_orientation(arot):
+    """
+    Args:
+        arot is quaternion x,y,z,w
+    Return:
+        angle in radian, rotate from (head to down) counter-clockwise
+    """
     arot_q = quaternion.from_float_array(np.array([arot[3], *arot[:3]]) )
     agent_forward = quaternion.rotate_vectors(arot_q, np.array([0,0,-1.]))
-    agent_orientation = math.atan2(agent_forward[0], agent_forward[2])
+    rot = math.atan2(agent_forward[0], agent_forward[2])
+    return rot
+
+def draw_agent(aloc, arot, np_map):
+    agent_orientation = get_agent_orientation(arot)
     agent_arrow = get_contour_points( (aloc[1], aloc[0], agent_orientation), size=15)
     cv2.drawContours(np_map, [agent_arrow], 0, (0,0,255,255), -1)
 
@@ -249,7 +259,7 @@ def draw_candidates(map, start_grid_pos, size, order):
     return overlay
 
 
-def create_candidates(nav_map, obj_maps, step_size=84):
+def create_candidates(nav_map, obj_maps, step_size=24):
     candidates = []
     # 6/0.05 = 120
     # sqrt(84 ** 2 * 2) < 120
